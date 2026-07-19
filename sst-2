@@ -1,9 +1,7 @@
 !pip -q install transformers datasets accelerate scikit-learn pandas
-
 import time
 import torch
 import pandas as pd
-
 from datasets import load_dataset
 from transformers import (
     AutoTokenizer,
@@ -12,15 +10,13 @@ from transformers import (
     Trainer,
     DataCollatorWithPadding,
 )
-
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
-MODEL_NAME = "distilbert-base-uncased"
+MODEL_NAME = "distilbert-base-uncased"   #
 TASK = "sst2"
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-
-dataset = load_dataset("glue", TASK)
+dataset = load_dataset("nyu-mll/glue", TASK)
 
 def preprocess(examples):
     return tokenizer(
@@ -30,7 +26,6 @@ def preprocess(examples):
     )
 
 dataset = dataset.map(preprocess, batched=True)
-
 data_collator = DataCollatorWithPadding(tokenizer)
 
 model = AutoModelForSequenceClassification.from_pretrained(
@@ -41,16 +36,13 @@ model = AutoModelForSequenceClassification.from_pretrained(
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
     preds = logits.argmax(axis=-1)
-
     acc = accuracy_score(labels, preds)
-
     precision, recall, f1, _ = precision_recall_fscore_support(
         labels,
         preds,
         average="weighted",
         zero_division=0
     )
-
     return {
         "accuracy": acc,
         "precision": precision,
@@ -68,7 +60,7 @@ training_args = TrainingArguments(
     warmup_steps=500,
     logging_steps=100,
     save_strategy="no",
-    eval_strategy="epoch",   # changed name
+    eval_strategy="epoch",
     report_to="none"
 )
 
@@ -77,7 +69,7 @@ trainer = Trainer(
     args=training_args,
     train_dataset=dataset["train"],
     eval_dataset=dataset["validation"],
-    tokenizer=tokenizer,
+    processing_class=tokenizer,   # <-- changed from tokenizer=tokenizer
     data_collator=data_collator,
     compute_metrics=compute_metrics
 )
@@ -97,10 +89,10 @@ memory_size_mb = sum(
 
 throughput = len(dataset["validation"]) / eval_time
 latency_ms = (eval_time / len(dataset["validation"])) * 1000
-
 energy_wh = (70 * (train_time + eval_time)) / 3600
 
 print("\n===== RESULTS =====")
+print("Model:", MODEL_NAME)
 print("Memory Size:", round(memory_size_mb,2), "MB")
 print("Latency:", round(latency_ms,4), "ms/sample")
 print("Accuracy:", round(metrics["eval_accuracy"],4))
